@@ -1,53 +1,46 @@
-from langchain_community.document_loaders import PyPDFDirectoryLoader
-from langchain_text_splitters import TokenTextSplitter
-from langchain_community.embeddings import OllamaEmbeddings
-import lancedb
-import pyarrow as pa
+import re
+import pickle
+import requests
+import zipfile
+from pathlib import Path
 
-embedding_model = OllamaEmbeddings()
+from langchain_community.document_loaders import UnstructuredHTMLLoader, PyPDFDirectoryLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import LanceDB
+from langchain.chains import RetrievalQA
+# from langchain_community.embeddings import OllamaEmbeddings
+from langchain_community.llms import Ollama
+# from langchain_community.llms import OpenAI
+from langchain_openai import OpenAIEmbeddings
+
+#Source Data
+loader = PyPDFDirectoryLoader("data/")
+pdf_docs = loader.load()
+
+# Parse Data
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=200,
+)
+documents = text_splitter.split_documents(pdf_docs)
+
+# Embed Data
+# embeddings = OllamaEmbeddings()
+embeddings = OpenAIEmbeddings() # OpenAI embedding is so much better, bad results via ollama for embedding
+
+# Store Data
+import lancedb
 
 db_path = "./lancedb"
 db = lancedb.connect(db_path)
 
-placeholder_embedding = embedding_model.embed_query("Hello World")
-if placeholder_embedding is not None:
-    placeholder_embedding_list = placeholder_embedding.tolist() if hasattr(placeholder_embedding, "tolist") else placeholder_embedding
-    placeholder_data = [{
-        "id": "placeholder",
-        "text": "Placeholder text",
-        "vector": placeholder_embedding_list,
-    }]
-    table = db.create_table(
-        "my_table",
-        data=placeholder_data,
-        mode="overwrite",
-    )
+table = db.create_table("pandas_docs", data=[
+    {"vector": embeddings.embed_query("Hello World"), "text": "Hello World", "id": "1"}
+], mode="overwrite")
+docsearch = LanceDB.from_documents(documents, embeddings, connection=table)
 
-loader = PyPDFDirectoryLoader("data/")
-docs = loader.load()
-text_splitter = TokenTextSplitter()
+qa = RetrievalQA.from_chain_type(llm=Ollama(model="llama2"), chain_type="stuff", retriever=docsearch.as_retriever())
+# qa = RetrievalQA.from_chain_type(llm=OpenAI(), chain_type="stuff", retriever=docsearch.as_retriever())
 
-for doc_index, doc in enumerate(docs):
-    text_content = getattr(doc, 'page_content', None)
-    if text_content:
-        tokenized_doc = text_splitter.split_text(text_content)
-        for chunk_index, chunk in enumerate(tokenized_doc):
-            chunk_text = ' '.join(chunk)
-            embedding = embedding_model.embed_query(chunk_text)
-            if embedding:
-                embedding_list = embedding.tolist() if hasattr(embedding, "tolist") else embedding
-                try:
-                    db["my_table"].add({
-                        "id": f"{doc_index}_{chunk_index}",
-                        "text": chunk_text,
-                        "vector": embedding_list,
-                    })
-                except Exception as e:
-                    print(f"Failed to insert data for chunk {chunk_index} of document {doc_index}: {e}")
-            else:
-                print(f"No embedding generated for chunk {chunk_index} of document {doc_index}.")
-    else:
-        print(f"Skipping a document {doc_index} due to missing text content.")
-
-print("Embeddings inserted into LanceDB successfully.")
-print(table.count_rows())
+query = "What are the 9 different FATCA account statuses?"
+print(qa.invoke(query))
