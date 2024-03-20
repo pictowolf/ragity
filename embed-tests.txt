@@ -1,0 +1,53 @@
+- OpenAI - spot on
+{'query': 'What are the 9 different FATCA account statuses?', 
+'result': '\
+n1. Initiated\
+n2. Registration Submitted\
+n3. Registration Incomplete\
+n4. Registration Under Review\
+n5. Registration Rejected/Denied\
+n6. Agreement Canceled\
+n7. Agreement Terminated\
+n8. Approved\
+n9. Limited Conditional'}
+
+- nomic-embed-text - close, n9 wrong
+{'query': 'What are the 9 different FATCA account statuses?', 
+'result': 'Based on the provided context, the 9 different FATCA account statuses are:\n\
+n1. Initiated - Your FATCA Account has been created, and you have a FATCA ID and Access Code. You need to complete and submit the FATCA Registration form.\
+n2. Registration Submitted - Your FATCA Registration has been submitted, and we are processing your registration.\
+n3. Registration Incomplete - Required fields are incomplete on your FATCA Registration, and you need to select "Registration - Edit/Complete/Submit" from your homepage to complete and submit your FATCA Registration.\
+n4. Registration Under Review - Your FATCA Registration is currently being reviewed, and no action is required on your part.\
+n5. Registration Rejected/Denied - Your FATCA Registration has been rejected, and no action is required.\
+n6. Agreement Canceled - You have canceled your FATCA Agreement, and you will no longer be able to access your FATCA account. If you want to establish a new FATCA Agreement, you must create a new account.\
+n7. Agreement Terminated - Your FATCA Agreement has been terminated, and no action is required.\
+n8. Approved - Your FATCA Agreement has been approved, and you have been assigned a GIIN that you can view via your homepage. Your Financial Institution (and its branches that are not Limited Branches) will appear on the next published IRS FFI List. No action is required at this time.\
+n9. Other - This status is reserved for cases where the FATCA account cannot be classified into any of the above categories, such as a status that is not yet applicable or a status that requires further review or investigation.'}
+
+- Llama2 - miles wrong
+{'query': 'What are the 9 different FATCA account statuses?', 
+'result': "Based on the provided context, there are 9 different FATCA account statuses that can be monitored on the registration system's email and message board:\n\
+n1. Approved\
+n2. In Progress\
+n3. Denied\n
+4. Withdrawn\
+n5. Expired\
+n6. Pending Review\
+n7. Active\
+n8. Suspended\
+n9. Closed\n\nNote that these statuses are related to the FATCA registration form and agreement, and may not be applicable to all cases. If you don't know the answer to a specific question or status, it is best to consult the IRS website or seek professional advice."}
+
+
+- Llama2 with BGE - Perfect - to do run locally 
+
+{'query': 'What are the 9 different FATCA account statuses?', 
+'result': 'Based on the provided context, there are 9 different FATCA account statuses:\n\
+n1. Initiated\
+n2. Registration Submitted\
+n3. Registration Incomplete\
+n4. Registration Under Review\
+n5. Registration Rejected/Denied\
+n6. Agreement Canceled\
+n7. Agreement Terminated\
+n8. Approved\
+n9. Limited Conditional'}

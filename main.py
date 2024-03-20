@@ -11,7 +11,17 @@ from langchain.chains import RetrievalQA
 # from langchain_community.embeddings import OllamaEmbeddings
 from langchain_community.llms import Ollama
 # from langchain_community.llms import OpenAI
-from langchain_openai import OpenAIEmbeddings
+# from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import HuggingFaceBgeEmbeddings
+
+model_name = "BAAI/bge-large-en-v1.5"
+model_kwargs = {'device': 'cuda'}
+encode_kwargs = {'normalize_embeddings': True} # set True to compute cosine similarity
+hf = HuggingFaceBgeEmbeddings(
+    model_name=model_name,
+    model_kwargs=model_kwargs,
+    encode_kwargs=encode_kwargs
+)
 
 #Source Data
 loader = PyPDFDirectoryLoader("data/")
@@ -25,8 +35,8 @@ text_splitter = RecursiveCharacterTextSplitter(
 documents = text_splitter.split_documents(pdf_docs)
 
 # Embed Data
-# embeddings = OllamaEmbeddings()
-embeddings = OpenAIEmbeddings() # OpenAI embedding is so much better, bad results via ollama for embedding
+embeddings = hf
+# embeddings = OpenAIEmbeddings() # OpenAI embedding is so much better, bad results via ollama for embedding
 
 # Store Data
 import lancedb
