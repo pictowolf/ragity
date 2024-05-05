@@ -1,4 +1,4 @@
-langchain==0.1.12
-langchain_community==0.0.28
-Requests==2.31.0
-sentence-transformers==2.5.1
+fastapi==0.111.0
+langchain==0.1.17
+langchain_community==0.0.36
+python-dotenv==1.0.1

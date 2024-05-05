@@ -4,8 +4,39 @@ from langchain_community.vectorstores import LanceDB
 from langchain.chains import RetrievalQA
 from langchain_community.llms import Ollama
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
+
 import lancedb
-import argparse
+import os
+from dotenv import load_dotenv
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+load_dotenv()
+
+os.getenv("LANGCHAIN_API_KEY")
+os.getenv("LANGCHAIN_TRACING_V2")
+os.getenv("LANGCHAIN_ENDPOINT")
+os.getenv("LANGCHAIN_PROJECT")
+
+# start with uvicorn main:app --reload, make readme at some point
+
+app = FastAPI(
+    title="Ragity",
+    description="RAG based LLM used to talk to internal documentation.",
+    version="0.0.1",
+    contact={
+        "name": "PictoWolf",
+        "email": "...."
+    }
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def setup_embeddings(model_name, model_kwargs, encode_kwargs):
     return HuggingFaceBgeEmbeddings(model_name=model_name, model_kwargs=model_kwargs, encode_kwargs=encode_kwargs)
@@ -26,36 +57,29 @@ def store_documents(documents, embeddings, db_path):
 def query_documents(qa_system, query):
     return qa_system.invoke(query)
 
-# Configuration and Setup
-def main(args):
+# Ingest documents endpoint
+@app.post("/ingest")
+async def ingest():
+    model_name = "BAAI/bge-large-en-v1.5"
+    model_kwargs = {'device': 'cuda'}
+    encode_kwargs = {'normalize_embeddings': True}
+    hf = setup_embeddings(model_name, model_kwargs, encode_kwargs)
+    documents = load_and_process_documents("data/")
+    store_documents(documents, hf, "./lancedb") 
+
+# Stream chat
+@app.post("/chat")
+async def chat(content: str):
     model_name = "BAAI/bge-large-en-v1.5"
     model_kwargs = {'device': 'cuda'}
     encode_kwargs = {'normalize_embeddings': True}
     hf = setup_embeddings(model_name, model_kwargs, encode_kwargs)
 
-    if args.ingest:
-        documents = load_and_process_documents(args.data_directory)
-        docsearch = store_documents(documents, hf, args.db_path)
-    else:
-        # Connect to existing database (assuming already exists)
-        db = lancedb.connect(args.db_path)
-        table = db.open_table("docs")
-        docsearch = LanceDB(connection=table, embedding=hf)
+    # Connect to existing database (assuming already exists)
+    db = lancedb.connect("./lancedb")
+    table = db.open_table("docs")
+    docsearch = LanceDB(connection=table, embedding=hf)
 
     qa = RetrievalQA.from_chain_type(llm=Ollama(model="llama2"), chain_type="stuff", retriever=docsearch.as_retriever())
-
-    # Interactive Query Loop
-    while True:
-        query = input("Enter your query (type 'exit' to stop): ")
-        if query.lower() == 'exit':
-            break
-        result = query_documents(qa, query)
-        print("Answer:", result)
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Process some documents.')
-    parser.add_argument('--ingest', action='store_true', help='Ingest and process the PDF documents to build the database')
-    parser.add_argument('data_directory', type=str, help='Directory where PDF documents are stored', default="data/", nargs='?')
-    parser.add_argument('db_path', type=str, help='Path to the database file', default="./lancedb", nargs='?')
-    args = parser.parse_args()
-    main(args)
+    result = query_documents(qa, content)
+    return result["result"]
