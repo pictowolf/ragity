@@ -30,7 +30,7 @@ app = FastAPI(
     version="0.0.1",
     contact={
         "name": "PictoWolf",
-        "email": "...."
+        "email": "test@test.com"
     }
 )
 app.add_middleware(
@@ -89,7 +89,7 @@ async def ingest():
     store_documents(documents, hf, os.getenv("LANCEDB_PATH"))
     logging.info("Finished Ingest process.")
 
-# Stream chat - somehow broke this - no idea how - could be ollama 
+# Chat
 @app.post("/chat")
 async def chat(content: str):
     logging.info("Starting Chat process.")
@@ -105,9 +105,11 @@ async def chat(content: str):
     logging.info("Searching documents.")
     docsearch = LanceDB(connection=table, embedding=hf)
 
-    logging.info("Sending context to Ollama for processing.") # Dies here RiP code
-    qa = RetrievalQA.from_chain_type(llm=Ollama(model="llama2"), chain_type="stuff", retriever=docsearch.as_retriever())
+    logging.info("Sending context to Ollama for processing.") 
+    qa = RetrievalQA.from_chain_type(llm=Ollama(model="llama3"), chain_type="stuff", retriever=docsearch.as_retriever())
 
     result = query_documents(qa, content)
     logging.info("Finished Chat process.")
     return result["result"]
+
+# Stream Tbd
