@@ -13,16 +13,41 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
+# Init env vars and logger
 load_dotenv()
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 os.getenv("LANGCHAIN_API_KEY")
 os.getenv("LANGCHAIN_TRACING_V2")
 os.getenv("LANGCHAIN_ENDPOINT")
 os.getenv("LANGCHAIN_PROJECT")
 # start with uvicorn main:app --reload, make readme at some point
+
+# Init global vars
+hf = None
+db = None
+table = None
+
+# FastAPI base config + cors
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global hf, db, table
+    model_name = "BAAI/bge-large-en-v1.5"
+    model_kwargs = {'device': 'cuda'}
+    encode_kwargs = {'normalize_embeddings': True}
+
+    # Init embeddings
+    hf = setup_embeddings(model_name, model_kwargs, encode_kwargs)
+    
+    # Init LanceDB
+    lancedb_path = os.getenv("LANCEDB_PATH")
+    db = lancedb.connect(lancedb_path)
+    table = db.open_table("docs")
+
+    yield
+    print("shutdown")
 
 app = FastAPI(
     title="Ragity",
@@ -31,7 +56,8 @@ app = FastAPI(
     contact={
         "name": "PictoWolf",
         "email": "test@test.com"
-    }
+    },
+    lifespan=lifespan
 )
 app.add_middleware(
     CORSMiddleware,
@@ -64,8 +90,7 @@ def load_and_process_documents(loader_path):
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     return text_splitter.split_documents(pdf_docs)
 
-def store_documents(documents, embeddings, db_path):
-    db = lancedb.connect(db_path)
+def store_documents(documents, embeddings):
     logging.info("Recreating table in vector store.")
 
     table = db.create_table("docs", data=[
@@ -80,27 +105,15 @@ def query_documents(qa_system, query):
 @app.post("/ingest")
 async def ingest():
     logging.info("Starting Ingest process.")
-    model_name = "BAAI/bge-large-en-v1.5"
-    model_kwargs = {'device': 'cuda'}
-    encode_kwargs = {'normalize_embeddings': True}
-
-    hf = setup_embeddings(model_name, model_kwargs, encode_kwargs)
     documents = load_and_process_documents(os.getenv("LOCAL_PATH"))
-    store_documents(documents, hf, os.getenv("LANCEDB_PATH"))
+    store_documents(documents, hf)
     logging.info("Finished Ingest process.")
+    return {"status": "Success", "message": "Documents ingested successfully."}
 
-# Chat
+# Chat endpoint
 @app.post("/chat")
 async def chat(content: str):
     logging.info("Starting Chat process.")
-    model_name = "BAAI/bge-large-en-v1.5"
-    model_kwargs = {'device': 'cuda'}
-    encode_kwargs = {'normalize_embeddings': True}
-
-    hf = setup_embeddings(model_name, model_kwargs, encode_kwargs)
-    logging.info("Connecting to database.")
-    db = lancedb.connect(os.getenv("LANCEDB_PATH"))
-    table = db.open_table("docs")
 
     logging.info("Searching documents.")
     docsearch = LanceDB(connection=table, embedding=hf)
